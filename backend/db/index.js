@@ -7,8 +7,10 @@ const pool = mysql.createPool({
   user: db.user,
   password: db.password,
   database: db.database,
+  // Aiven requires SSL, but its CA is self-signed.
+  // For simplicity we disable strict certificate validation here.
   ssl: {
-    rejectUnauthorized: true,
+    rejectUnauthorized: false,
   },
 });
 
