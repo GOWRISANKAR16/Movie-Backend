@@ -25,6 +25,9 @@ if (!JWT_SECRET) {
   console.warn('JWT_SECRET is not set. Authentication will not be secure.');
 }
 
+// Strip spaces/newlines so env pasted with line breaks still works (e.g. on Render)
+const normalizedJwtSecret = typeof JWT_SECRET === 'string' ? JWT_SECRET.replace(/\s+/g, '') : JWT_SECRET;
+
 module.exports = {
   env: NODE_ENV,
   port: Number(PORT) || 5000,
@@ -37,7 +40,7 @@ module.exports = {
     database: DB_NAME,
   },
   jwt: {
-    secret: JWT_SECRET,
+    secret: normalizedJwtSecret,
     expiresIn: '1h',
   },
   cookie: {

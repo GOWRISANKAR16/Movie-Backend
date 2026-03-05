@@ -65,12 +65,23 @@ exports.register = async (req, res) => {
     return res.status(201).json({ message: 'Register success' });
   } catch (error) {
     console.error('Error in /register:', error);
-    return res.status(500).json({ message: 'Internal server error' });
+    const isDbError = error.code === 'ECONNREFUSED' || error.code === 'ETIMEDOUT' || (error.code && String(error.code).startsWith('ER_'));
+    const message = isDbError
+      ? 'Database unavailable. Check Render env (DB_*) and that the users table exists.'
+      : 'Internal server error';
+    return res.status(isDbError ? 503 : 500).json({ message });
   }
 };
 
 exports.login = async (req, res) => {
   try {
+    if (!config.jwt.secret) {
+      console.error('JWT_SECRET is not set. Set it in .env (local) or Render Environment.');
+      return res.status(500).json({
+        message: 'Server error: authentication not configured. Please try again later.',
+      });
+    }
+
     const { username, password } = req.body;
 
     if (!username || !password) {
@@ -80,6 +91,11 @@ exports.login = async (req, res) => {
     const user = await findUserByUsername(username);
     if (!user) {
       return res.status(401).json({ message: 'Invalid credentials' });
+    }
+
+    if (!user.password) {
+      console.error('User from DB has no password field:', user);
+      return res.status(500).json({ message: 'Server error. Please try again later.' });
     }
 
     const passwordMatches = await bcrypt.compare(password, user.password);
@@ -109,7 +125,16 @@ exports.login = async (req, res) => {
     return res.status(200).json({ message: 'Login successful' });
   } catch (error) {
     console.error('Error in /login:', error);
-    return res.status(500).json({ message: 'Internal server error' });
+    const isDbError = error.code === 'ECONNREFUSED' || error.code === 'ETIMEDOUT' || (error.code && String(error.code).startsWith('ER_'));
+    const isJwtError = error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError';
+    const message = !config.jwt.secret
+      ? 'Server error: authentication not configured.'
+      : isJwtError
+        ? 'Authentication error.'
+        : isDbError
+          ? 'Database unavailable. Check Render env (DB_*).'
+          : 'Internal server error';
+    return res.status(isDbError ? 503 : 500).json({ message });
   }
 };
 
